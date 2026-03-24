@@ -186,7 +186,7 @@ export default function HiltonAIConcierge() {
       background: "linear-gradient(145deg, #001A33 0%, #003366 40%, #114C98 100%)",
       fontFamily: "'Source Sans 3', sans-serif",
     }}>
-      <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap" rel="stylesheet" />
+      {/* Google Fonts loaded via index.html or fallback to system fonts */}
       <style>{`
         @keyframes hiltonPulse { 0%,100%{opacity:.3;transform:scale(.85)} 50%{opacity:1;transform:scale(1.1)} }
         @keyframes hiltonSlideIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
