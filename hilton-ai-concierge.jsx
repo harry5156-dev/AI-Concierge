@@ -31,6 +31,51 @@ function getResponse(input) {
   return "Thank you for reaching out. I would be happy to assist you with that. As your dedicated AI Concierge at Transcorp Hilton Abuja, I can help with dining reservations, spa bookings, transportation, local recommendations, and much more. How may I be of service?";
 }
 
+function renderFormattedContent(content, isUser) {
+  const boldColor = isUser ? "#A4BBDA" : "#003366";
+  const bulletColor = isUser ? "#A4BBDA" : "#009CDE";
+  const lines = content.split("\n");
+  return lines.map((line, lineIdx) => {
+    const parts = [];
+    let lastIndex = 0;
+    const boldRegex = /\*\*(.*?)\*\*/g;
+    let match;
+    while ((match = boldRegex.exec(line)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(line.slice(lastIndex, match.index));
+      }
+      parts.push(
+        <strong key={`b-${lineIdx}-${match.index}`} style={{ color: boldColor, fontWeight: 600 }}>
+          {match[1]}
+        </strong>
+      );
+      lastIndex = boldRegex.lastIndex;
+    }
+    if (lastIndex < line.length) {
+      parts.push(line.slice(lastIndex));
+    }
+    if (line.startsWith("• ")) {
+      const bulletContent = parts.length > 0 ? parts : [line.slice(2)];
+      if (typeof bulletContent[0] === "string" && bulletContent[0].startsWith("• ")) {
+        bulletContent[0] = bulletContent[0].slice(2);
+      }
+      return (
+        <span key={`l-${lineIdx}`}>
+          {lineIdx > 0 && "\n"}
+          <span style={{ color: bulletColor, marginRight: 6 }}>{"●"}</span>
+          {bulletContent}
+        </span>
+      );
+    }
+    return (
+      <span key={`l-${lineIdx}`}>
+        {lineIdx > 0 && "\n"}
+        {parts.length > 0 ? parts : line}
+      </span>
+    );
+  });
+}
+
 function TypingIndicator() {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0" }}>
@@ -90,13 +135,9 @@ function MessageBubble({ message, isLast }) {
         fontFamily: "'Source Sans 3', sans-serif",
         whiteSpace: "pre-line",
         boxShadow: isUser ? "0 2px 12px rgba(0,51,102,0.2)" : "0 1px 4px rgba(0,0,0,0.04)",
-      }}
-        dangerouslySetInnerHTML={{
-          __html: message.content
-            .replace(/\*\*(.*?)\*\*/g, `<strong style="color:${isUser ? '#A4BBDA' : '#003366'};font-weight:600">$1</strong>`)
-            .replace(/^• /gm, `<span style="color:${isUser ? '#A4BBDA' : '#009CDE'};margin-right:6px">●</span> `)
-        }}
-      />
+      }}>
+        {renderFormattedContent(message.content, isUser)}
+      </div>
     </div>
   );
 }
@@ -108,23 +149,33 @@ export default function HiltonAIConcierge() {
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(true);
-  const [guestName] = useState("Mr. Okonkwo");
-  const [roomNumber] = useState("1205");
+  const guestName = "Mr. Okonkwo";
+  const roomNumber = "1205";
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
+  const idCounter = useRef(1);
+  const typingTimeoutRef = useRef(null);
+
+  const nextId = () => ++idCounter.current;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, isTyping]);
 
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    };
+  }, []);
+
   const sendMessage = (text) => {
     if (!text.trim()) return;
-    setMessages(prev => [...prev, { id: Date.now(), role: "user", content: text.trim(), time: "Now" }]);
+    setMessages(prev => [...prev, { id: nextId(), role: "user", content: text.trim(), time: "Now" }]);
     setInput("");
     setIsTyping(true);
     setShowQuickActions(false);
-    setTimeout(() => {
-      setMessages(prev => [...prev, { id: Date.now() + 1, role: "assistant", content: getResponse(text), time: "Now" }]);
+    typingTimeoutRef.current = setTimeout(() => {
+      setMessages(prev => [...prev, { id: nextId(), role: "assistant", content: getResponse(text), time: "Now" }]);
       setIsTyping(false);
     }, 1200 + Math.random() * 800);
   };
@@ -146,6 +197,19 @@ export default function HiltonAIConcierge() {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(0,51,102,0.15); border-radius: 4px; }
         ::placeholder { color: #94A3B8; }
+        .hilton-quick-btn { transition: all 0.25s ease; }
+        .hilton-quick-btn:hover {
+          background: #003366 !important;
+          border-color: #003366 !important;
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(0,51,102,0.2) !important;
+        }
+        .hilton-quick-btn:hover span:last-child { color: #FFFFFF !important; }
+        .hilton-input-wrap { transition: border-color 0.25s ease, box-shadow 0.25s ease; }
+        .hilton-input-wrap:focus-within {
+          border-color: #003366 !important;
+          box-shadow: 0 0 0 3px rgba(0,51,102,0.1) !important;
+        }
       `}</style>
 
       {/* Decorative circles */}
@@ -247,30 +311,15 @@ export default function HiltonAIConcierge() {
               }}>How may I assist you?</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                 {QUICK_ACTIONS.map((action, i) => (
-                  <button key={i} onClick={() => sendMessage(action.prompt)} style={{
+                  <button key={i} onClick={() => sendMessage(action.prompt)} className="hilton-quick-btn" style={{
                     background: "#FFFFFF",
                     border: "1px solid #E2E8F0",
                     borderRadius: 14, padding: "14px 6px",
                     display: "flex", flexDirection: "column", alignItems: "center",
-                    gap: 7, cursor: "pointer", transition: "all 0.25s ease",
+                    gap: 7, cursor: "pointer",
                     animation: `hiltonFadeIn 0.5s ease-out ${0.4 + i * 0.07}s both`,
                     boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                  }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = "#003366";
-                      e.currentTarget.style.borderColor = "#003366";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,51,102,0.2)";
-                      e.currentTarget.querySelector("span:last-child").style.color = "#FFFFFF";
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = "#FFFFFF";
-                      e.currentTarget.style.borderColor = "#E2E8F0";
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)";
-                      e.currentTarget.querySelector("span:last-child").style.color = "#334155";
-                    }}
-                  >
+                  }}>
                     <span style={{ fontSize: 22 }}>{action.icon}</span>
                     <span style={{
                       fontSize: 11, color: "#334155", fontWeight: 600,
@@ -288,21 +337,19 @@ export default function HiltonAIConcierge() {
           padding: "10px 14px 18px",
           borderTop: "1px solid #E2E8F0", background: "#FFFFFF",
         }}>
-          <div style={{
+          <div className="hilton-input-wrap" style={{
             display: "flex", alignItems: "center", gap: 8,
             background: "#F0F4F8", borderRadius: 16,
             padding: "4px 5px 4px 18px",
             border: "2px solid transparent",
-            transition: "border-color 0.25s ease, box-shadow 0.25s ease",
-          }}
-            onFocus={e => { e.currentTarget.style.borderColor = "#003366"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(0,51,102,0.1)"; }}
-            onBlur={e => { e.currentTarget.style.borderColor = "transparent"; e.currentTarget.style.boxShadow = "none"; }}
-          >
+          }}>
             <input
               ref={inputRef} value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
               placeholder="Ask your concierge anything..."
+              maxLength={500}
+              aria-label="Type your message"
               style={{
                 flex: 1, border: "none", outline: "none",
                 background: "transparent", color: "#1A2A3A",
@@ -310,7 +357,7 @@ export default function HiltonAIConcierge() {
                 padding: "10px 0",
               }}
             />
-            <button onClick={() => sendMessage(input)} disabled={!input.trim() || isTyping} style={{
+            <button onClick={() => sendMessage(input)} disabled={!input.trim() || isTyping} aria-label="Send message" style={{
               width: 40, height: 40, borderRadius: 12, border: "none",
               background: input.trim() && !isTyping ? "#003366" : "#CBD5E1",
               color: "#FFFFFF",
